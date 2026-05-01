@@ -4,7 +4,11 @@ import time
 import pytest
 import requests
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://gaming-cafe-admin-1.preview.emergentagent.com").rstrip("/")
+BASE_URL = (
+    os.environ.get("EXPO_PUBLIC_BACKEND_URL")
+    or os.environ.get("EXPO_BACKEND_URL")
+    or "https://gaming-cafe-admin-1.preview.emergentagent.com"
+).rstrip("/")
 API = f"{BASE_URL}/api"
 
 
@@ -181,7 +185,7 @@ class TestCafeteria:
 
 # ------- Reports -------
 class TestReports:
-    @pytest.mark.parametrize("period", ["today", "week", "month", "all"])
+    @pytest.mark.parametrize("period", ["today", "week", "month", "year", "all"])
     def test_report_periods(self, s, period):
         r = s.get(f"{API}/reports", params={"period": period})
         assert r.status_code == 200, r.text
@@ -191,3 +195,94 @@ class TestReports:
             assert k in d
         assert d["period"] == period
         assert round(d["play_revenue"] + d["cafeteria_revenue"], 3) == d["total_revenue"]
+
+
+# ------- New: Rooms report -------
+class TestRoomsReport:
+    @pytest.mark.parametrize("period", ["today", "week", "month", "year", "all"])
+    def test_rooms_report_returns_16_with_required_fields(self, s, period):
+        r = s.get(f"{API}/reports/rooms", params={"period": period})
+        assert r.status_code == 200, r.text
+        rows = r.json()
+        assert isinstance(rows, list)
+        assert len(rows) == 16
+        required = {"room_id", "room_name", "sessions_count",
+                    "total_minutes", "play_revenue",
+                    "cafeteria_revenue", "total_revenue"}
+        for row in rows:
+            assert required.issubset(row.keys()), f"missing keys: {required - row.keys()}"
+            assert row["sessions_count"] >= 0
+            assert row["total_minutes"] >= 0
+            assert round(row["play_revenue"] + row["cafeteria_revenue"], 3) == row["total_revenue"]
+
+
+# ------- New: Edit session times -------
+class TestSessionTimesEdit:
+    """PUT /api/sessions/{id}/times for both active and closed sessions."""
+    room_id = None
+    active_session_id = None
+    closed_session_id = None
+
+    def test_setup_active_and_closed_sessions(self, s):
+        rooms = s.get(f"{API}/rooms").json()
+        # Use a room with no active session
+        active = s.get(f"{API}/sessions/active").json()
+        busy = {a["room_id"] for a in active}
+        free = [r for r in rooms if r["id"] not in busy]
+        assert len(free) >= 2, "need at least 2 free rooms"
+        TestSessionTimesEdit.room_id = free[0]["id"]
+        # active session
+        r = s.post(f"{API}/rooms/{free[0]['id']}/start")
+        assert r.status_code == 200, r.text
+        TestSessionTimesEdit.active_session_id = r.json()["id"]
+        # closed session
+        r2 = s.post(f"{API}/rooms/{free[1]['id']}/start")
+        assert r2.status_code == 200, r2.text
+        sid = r2.json()["id"]
+        r3 = s.post(f"{API}/sessions/{sid}/stop")
+        assert r3.status_code == 200, r3.text
+        TestSessionTimesEdit.closed_session_id = sid
+
+    def test_edit_active_backdates_start_and_recomputes(self, s):
+        sid = TestSessionTimesEdit.active_session_id
+        # backdate start by 30 minutes
+        from datetime import datetime, timezone, timedelta
+        new_start = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+        r = s.put(f"{API}/sessions/{sid}/times", json={"started_at": new_start})
+        assert r.status_code == 200, r.text
+        sess = r.json()
+        assert sess["status"] == "active"
+        # 30 min @ price/hour. price 2.0 → ~1.0; allow 28-32 min window
+        assert 28 <= sess["elapsed_minutes"] <= 32
+        assert sess["play_cost"] > 0
+        assert round(sess["play_cost"] + sess["cafeteria_cost"], 3) == sess["total_cost"]
+
+    def test_edit_closed_session_recomputes(self, s):
+        sid = TestSessionTimesEdit.closed_session_id
+        from datetime import datetime, timezone, timedelta
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(hours=2)
+        r = s.put(f"{API}/sessions/{sid}/times", json={
+            "started_at": start.isoformat(),
+            "ended_at": end.isoformat(),
+        })
+        assert r.status_code == 200, r.text
+        sess = r.json()
+        assert sess["status"] == "closed"
+        assert 119 <= sess["elapsed_minutes"] <= 121
+        # price 2.0/hour → 4.0
+        assert sess["play_cost"] > 0
+
+    def test_invalid_datetime_returns_400(self, s):
+        sid = TestSessionTimesEdit.active_session_id
+        r = s.put(f"{API}/sessions/{sid}/times", json={"started_at": "not-a-date"})
+        assert r.status_code == 400, f"expected 400, got {r.status_code}: {r.text}"
+
+    def test_session_not_found_returns_404(self, s):
+        r = s.put(f"{API}/sessions/nonexistent-id/times",
+                  json={"started_at": "2026-01-01T00:00:00+00:00"})
+        assert r.status_code == 404
+
+    def test_cleanup(self, s):
+        if TestSessionTimesEdit.active_session_id:
+            s.post(f"{API}/sessions/{TestSessionTimesEdit.active_session_id}/stop")

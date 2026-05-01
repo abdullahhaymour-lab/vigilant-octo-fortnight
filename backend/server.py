@@ -90,6 +90,11 @@ class AddItemRequest(BaseModel):
     quantity: int = 1
 
 
+class SessionTimeUpdate(BaseModel):
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+
+
 class CafeteriaSaleItem(BaseModel):
     product_id: str
     quantity: int = 1
@@ -396,17 +401,32 @@ class ReportResponse(BaseModel):
     cafeteria_sales_count: int
 
 
-@api_router.get("/reports", response_model=ReportResponse)
-async def get_report(period: Literal["today", "week", "month", "all"] = "today"):
+def _period_start(period: str) -> datetime:
     now = datetime.now(timezone.utc)
     if period == "today":
-        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif period == "week":
-        start_dt = now - timedelta(days=7)
-    elif period == "month":
-        start_dt = now - timedelta(days=30)
-    else:
-        start_dt = datetime.fromtimestamp(0, tz=timezone.utc)
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == "week":
+        return now - timedelta(days=7)
+    if period == "month":
+        return now - timedelta(days=30)
+    if period == "year":
+        return now - timedelta(days=365)
+    return datetime.fromtimestamp(0, tz=timezone.utc)
+
+
+class RoomReportItem(BaseModel):
+    room_id: str
+    room_name: str
+    sessions_count: int
+    total_minutes: int
+    play_revenue: float
+    cafeteria_revenue: float
+    total_revenue: float
+
+
+@api_router.get("/reports", response_model=ReportResponse)
+async def get_report(period: Literal["today", "week", "month", "year", "all"] = "today"):
+    start_dt = _period_start(period)
 
     start_iso = start_dt.isoformat()
 
@@ -434,6 +454,38 @@ async def get_report(period: Literal["today", "week", "month", "all"] = "today")
         sessions_count=len(closed),
         cafeteria_sales_count=len(sales),
     )
+
+
+@api_router.get("/reports/rooms", response_model=List[RoomReportItem])
+async def rooms_report(period: Literal["today", "week", "month", "year", "all"] = "today"):
+    start_dt = _period_start(period)
+    start_iso = start_dt.isoformat()
+    rooms = await db.rooms.find({}, {"_id": 0}).sort("order", 1).to_list(100)
+    closed = await db.sessions.find(
+        {"status": "closed", "ended_at": {"$gte": start_iso}},
+        {"_id": 0}
+    ).to_list(10000)
+    by_room: dict = {}
+    for s in closed:
+        rid = s["room_id"]
+        agg = by_room.setdefault(rid, {"count": 0, "minutes": 0, "play": 0.0, "cafe": 0.0})
+        agg["count"] += 1
+        agg["minutes"] += s.get("elapsed_minutes", 0)
+        agg["play"] += s.get("play_cost", 0)
+        agg["cafe"] += s.get("cafeteria_cost", 0)
+    out: List[RoomReportItem] = []
+    for r in rooms:
+        a = by_room.get(r["id"], {"count": 0, "minutes": 0, "play": 0.0, "cafe": 0.0})
+        out.append(RoomReportItem(
+            room_id=r["id"],
+            room_name=r["name"],
+            sessions_count=a["count"],
+            total_minutes=a["minutes"],
+            play_revenue=round(a["play"], 3),
+            cafeteria_revenue=round(a["cafe"], 3),
+            total_revenue=round(a["play"] + a["cafe"], 3),
+        ))
+    return out
 
 
 @api_router.get("/")

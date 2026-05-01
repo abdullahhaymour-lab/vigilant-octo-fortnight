@@ -160,6 +160,22 @@ export default function Dashboard() {
     }
   };
 
+  const adjustStartTime = async (minutesBack: number) => {
+    if (!selectedSession) return;
+    const newStart = new Date(
+      new Date(selectedSession.started_at).getTime() - minutesBack * 60000
+    ).toISOString();
+    try {
+      const updated = await api.updateSessionTimes(selectedSession.id, {
+        started_at: newStart,
+      });
+      setSelectedSession(updated);
+      await loadAll();
+    } catch (e: any) {
+      Alert.alert("خطأ", e.message);
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -344,6 +360,23 @@ export default function Dashboard() {
                       </Text>
                     </View>
                   </View>
+                </View>
+
+                <Text style={styles.sectionTitle}>تعديل وقت البداية</Text>
+                <Text style={styles.adjustHint}>ابدأت متأخراً؟ اضغط لإرجاع وقت البداية</Text>
+                <View style={styles.adjustRow}>
+                  {[5, 15, 30, 60].map((m) => (
+                    <TouchableOpacity
+                      key={m}
+                      style={styles.adjustBtn}
+                      onPress={() => adjustStartTime(m)}
+                      testID={`adjust-back-${m}`}
+                    >
+                      <Text style={styles.adjustText}>
+                        - {m >= 60 ? "1 ساعة" : `${m} دقيقة`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
 
                 <Text style={styles.sectionTitle}>طلبات الكافتيريا</Text>
@@ -648,4 +681,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   stopText: { color: "#FFF", fontSize: 16, fontWeight: "900" },
+  adjustHint: { color: COLORS.textDim, fontSize: 11, marginTop: -8, marginBottom: 10 },
+  adjustRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  adjustBtn: {
+    backgroundColor: COLORS.surface2,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  adjustText: { color: COLORS.primary, fontSize: 12, fontWeight: "800" },
 });

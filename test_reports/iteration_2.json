@@ -1,0 +1,53 @@
+{
+  "summary": "Iteration 2 testing on new features. Backend: 28/31 pytest tests pass. CRITICAL: PUT /api/sessions/{id}/times endpoint is NOT implemented in server.py — the SessionTimeUpdate Pydantic model is defined (line 93-95) but no route handler exists, so all calls return 404. This breaks (a) the History edit-times modal in reports.tsx (saveEdit) and (b) the dashboard quick-adjust buttons (-5/-15/-30/-60 min) in index.tsx. All other new endpoints work: GET /api/reports?period=year (200), GET /api/reports/rooms?period=today|week|month|year|all returns 16 room rows with all required fields. Frontend: All testIDs present and screens render correctly — period selector shows 5 options (today/week/month/year/all), 3 sub-tabs (ملخص/حسب الغرفة/السجل), 16 ranked rooms in rooms tab, history rows are tappable and open edit modal with start/end inputs + save button.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "PUT /api/sessions/{session_id}/times",
+        "issue": "Route handler is completely missing in server.py. Pydantic model SessionTimeUpdate is defined at line 93 but no @api_router.put('/sessions/{session_id}/times') exists. Returns 404 'Not Found' for every call. This breaks both edit-session-times modal (reports.tsx saveEdit) and the 4 quick-adjust buttons in dashboard active-session modal (-5/-15/-30/-60 min).",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Edit closed-session times in History sub-tab",
+        "issue": "User taps a history row, edits start/end times in YYYY-MM-DD HH:MM format, taps 'حفظ التعديلات' → frontend calls PUT /api/sessions/{id}/times → backend returns 404 → user sees Arabic 'خطأ' alert with message 'Not Found' (or similar). Will work as soon as backend route is added.",
+        "affected_testIDs": ["history-row-*", "edit-start-input", "edit-end-input", "save-times-btn"]
+      },
+      {
+        "flow": "Quick-adjust backdate start time in Dashboard active-session modal",
+        "issue": "Tapping any of the 4 buttons -5/-15/-30/-1 ساعة calls api.updateSessionTimes which hits the missing PUT route → 404 → the start time is not adjusted and elapsed/play_cost are not recomputed.",
+        "affected_testIDs": ["adjust-back-5", "adjust-back-15", "adjust-back-30", "adjust-back-60"]
+      }
+    ],
+    "design_issues": [
+      {"screen": "all", "issues": ["Same deprecation warnings noted in iter_1 still present (shadow*, props.pointerEvents). Cosmetic only."]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_playstation_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "ADD missing route in /app/backend/server.py: @api_router.put('/sessions/{session_id}/times', response_model=Session) async def update_session_times(session_id: str, body: SessionTimeUpdate). It must: (1) find session by id (404 if not found), (2) validate started_at/ended_at via datetime.fromisoformat (catch ValueError → raise HTTPException(400, 'صيغة وقت غير صحيحة')), (3) update started_at and/or ended_at fields, (4) recompute via compute_play_cost using new started_at and (ended_at if status=='closed' or provided ended_at)  → update elapsed_minutes, play_cost, total_cost (= play_cost + cafeteria_cost) in Mongo, (5) return updated Session. Without this fix, the edit-times modal AND all 4 quick-adjust buttons are broken end-to-end."
+  ],
+  "critical_code_review_comments": [
+    "server.py defines class SessionTimeUpdate(BaseModel) at line 93 but never references it — clear sign the route was forgotten.",
+    "compute_play_cost helper already accepts an optional ended_at_iso, so the fix is straightforward and mirrors stop_session logic.",
+    "Frontend (reports.tsx & index.tsx) is correctly wired: api.updateSessionTimes posts to /sessions/{id}/times with started_at and optional ended_at — fix is purely backend."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_playstation_api.py (added TestRoomsReport class with 5 parametrized period tests, added TestSessionTimesEdit class with 6 tests covering active edit, closed edit, invalid datetime → 400, session-not-found → 404, plus setup/cleanup. Also made BASE_URL fall through both EXPO_PUBLIC_BACKEND_URL and EXPO_BACKEND_URL.)"
+  ],
+  "success_rate": {"backend": "90% (28/31) — 3 failures all caused by single missing route", "frontend": "100% UI rendering smoke (all 8 new testIDs present, modal opens, period switching works)"},
+  "seed_data_creation": "Started 2 fresh sessions during TestSessionTimesEdit (one left active for edit test, one stopped for closed-edit test). test_cleanup stops the active one. The closed one remains in history (room not specified — used first 2 free rooms).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "After main agent adds PUT /api/sessions/{session_id}/times to server.py, simply re-run: pytest /app/backend/tests/test_playstation_api.py::TestSessionTimesEdit -v . All 6 tests in that class should pass. Frontend will then automatically work (no FE changes needed). Existing 28 tests are regression-safe.",
+  "rca_of_issue": "ROOT CAUSE: server.py is missing the PUT /api/sessions/{session_id}/times route handler. The Pydantic request body model SessionTimeUpdate is defined (lines 93-95) but no @api_router.put decorator was added. REPRODUCTION: curl -X PUT $URL/api/sessions/anything/times -H 'Content-Type: application/json' -d '{}' → HTTP 404 {\"detail\":\"Not Found\"}. MITIGATION: Add the missing route handler that updates started_at/ended_at and recomputes elapsed_minutes/play_cost/total_cost using the existing compute_play_cost helper. ~20 lines of code."
+}

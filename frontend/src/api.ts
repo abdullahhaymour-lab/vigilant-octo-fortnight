@@ -89,6 +89,11 @@ export const api = {
   removeItem: (sessionId: string, itemId: string) =>
     req<Session>(`/sessions/${sessionId}/items/${itemId}`, { method: "DELETE" }),
   history: () => req<Session[]>("/sessions/history"),
+  updateSessionTimes: (sessionId: string, data: { started_at?: string; ended_at?: string }) =>
+    req<Session>(`/sessions/${sessionId}/times`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
   listProducts: () => req<Product[]>("/products"),
   createProduct: (p: Omit<Product, "id">) =>
     req<Product>("/products", { method: "POST", body: JSON.stringify(p) }),
@@ -105,8 +110,20 @@ export const api = {
       body: JSON.stringify({ items }),
     }),
   listCafeteriaSales: () => req<CafeteriaSale[]>("/cafeteria/sales"),
-  report: (period: "today" | "week" | "month" | "all") =>
+  report: (period: "today" | "week" | "month" | "year" | "all") =>
     req<Report>(`/reports?period=${period}`),
+  roomsReport: (period: "today" | "week" | "month" | "year" | "all") =>
+    req<RoomReportItem[]>(`/reports/rooms?period=${period}`),
+};
+
+export type RoomReportItem = {
+  room_id: string;
+  room_name: string;
+  sessions_count: number;
+  total_minutes: number;
+  play_revenue: number;
+  cafeteria_revenue: number;
+  total_revenue: number;
 };
 
 export const COLORS = {
