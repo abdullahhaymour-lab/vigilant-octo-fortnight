@@ -36,6 +36,7 @@ export default function Dashboard() {
   const [tick, setTick] = useState(0);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [receipt, setReceipt] = useState<Session | null>(null);
 
   const loadAll = useCallback(async () => {
     try {
@@ -105,12 +106,21 @@ export default function Dashboard() {
   const handleStop = async () => {
     if (!selectedSession) return;
     try {
-      await api.stopSession(selectedSession.id);
+      const closed = await api.stopSession(selectedSession.id);
       setSelectedRoom(null);
       setSelectedSession(null);
+      setReceipt(closed);
       await loadAll();
     } catch (e: any) {
       Alert.alert("خطأ", e.message);
+    }
+  };
+
+  const printReceipt = () => {
+    if (typeof window !== "undefined" && (window as any).print) {
+      (window as any).print();
+    } else {
+      Alert.alert("الطباعة", "ميزة الطباعة متاحة على المتصفح فقط");
     }
   };
 
@@ -415,6 +425,126 @@ export default function Dashboard() {
           </View>
         </View>
       </Modal>
+
+      {/* Receipt Modal */}
+      <Modal
+        visible={!!receipt}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setReceipt(null)}
+      >
+        <View style={styles.receiptOverlay}>
+          <View style={styles.receiptCard}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.receiptHeader}>
+                <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
+                <Text style={styles.receiptTitle}>تم الدفع بنجاح</Text>
+                <Text style={styles.receiptSub}>صالة البلايستيشن</Text>
+              </View>
+
+              <View style={styles.receiptDivider} />
+
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>الغرفة</Text>
+                <Text style={styles.receiptValue}>{receipt?.room_name}</Text>
+              </View>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>سعر الساعة</Text>
+                <Text style={styles.receiptValue}>
+                  {receipt ? formatJD(receipt.price_per_hour) : ""}
+                </Text>
+              </View>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>وقت البداية</Text>
+                <Text style={styles.receiptValueSmall}>
+                  {receipt
+                    ? new Date(receipt.started_at).toLocaleString("ar")
+                    : ""}
+                </Text>
+              </View>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>وقت النهاية</Text>
+                <Text style={styles.receiptValueSmall}>
+                  {receipt?.ended_at
+                    ? new Date(receipt.ended_at).toLocaleString("ar")
+                    : ""}
+                </Text>
+              </View>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>المدة</Text>
+                <Text style={styles.receiptValue}>
+                  {receipt
+                    ? `${Math.floor(receipt.elapsed_minutes / 60)} س ${receipt.elapsed_minutes % 60} د`
+                    : ""}
+                </Text>
+              </View>
+
+              <View style={styles.receiptDivider} />
+
+              {receipt && receipt.items.length > 0 && (
+                <>
+                  <Text style={styles.receiptSection}>طلبات الكافتيريا</Text>
+                  {receipt.items.map((it) => (
+                    <View key={it.id} style={styles.receiptItemRow}>
+                      <Text style={styles.receiptItemName}>
+                        {it.product_name} × {it.quantity}
+                      </Text>
+                      <Text style={styles.receiptItemPrice}>
+                        {formatJD(it.subtotal)}
+                      </Text>
+                    </View>
+                  ))}
+                  <View style={styles.receiptDivider} />
+                </>
+              )}
+
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>تكلفة اللعب</Text>
+                <Text style={styles.receiptValue}>
+                  {receipt ? formatJD(receipt.play_cost) : ""}
+                </Text>
+              </View>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptLabel}>تكلفة الكافتيريا</Text>
+                <Text style={styles.receiptValue}>
+                  {receipt ? formatJD(receipt.cafeteria_cost) : ""}
+                </Text>
+              </View>
+
+              <View style={styles.receiptTotalBox}>
+                <Text style={styles.receiptTotalLabel}>الإجمالي المستحق</Text>
+                <Text style={styles.receiptTotalValue}>
+                  {receipt ? formatJD(receipt.total_cost) : ""}
+                </Text>
+              </View>
+
+              <Text style={styles.receiptThanks}>شكراً لزيارتكم 🎮</Text>
+              <Text style={styles.receiptDate}>
+                {new Date().toLocaleString("ar")}
+              </Text>
+
+              <View style={styles.receiptActions}>
+                <TouchableOpacity
+                  style={styles.receiptBtn}
+                  onPress={printReceipt}
+                  testID="print-receipt-btn"
+                >
+                  <Ionicons name="print" size={18} color={COLORS.text} />
+                  <Text style={styles.receiptBtnText}>طباعة</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.receiptBtn, styles.receiptBtnPrimary]}
+                  onPress={() => setReceipt(null)}
+                  testID="close-receipt-btn"
+                >
+                  <Ionicons name="checkmark" size={18} color="#000" />
+                  <Text style={[styles.receiptBtnText, { color: "#000" }]}>تم</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -668,4 +798,93 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   adjustText: { color: COLORS.primary, fontSize: 12, fontWeight: "800" },
+  receiptOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  receiptCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    maxHeight: "92%",
+  },
+  receiptHeader: { alignItems: "center", marginBottom: 16 },
+  receiptTitle: { color: "#10B981", fontSize: 20, fontWeight: "900", marginTop: 8 },
+  receiptSub: { color: "#71717A", fontSize: 13, marginTop: 4 },
+  receiptDivider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+    marginVertical: 12,
+    borderStyle: "dashed",
+    borderWidth: 0.5,
+    borderColor: "#E5E7EB",
+  },
+  receiptRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  receiptLabel: { color: "#6B7280", fontSize: 13, fontWeight: "600" },
+  receiptValue: { color: "#111827", fontSize: 14, fontWeight: "800" },
+  receiptValueSmall: { color: "#111827", fontSize: 11, fontWeight: "600" },
+  receiptSection: {
+    color: "#111827",
+    fontSize: 13,
+    fontWeight: "900",
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  receiptItemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 3,
+  },
+  receiptItemName: { color: "#374151", fontSize: 12 },
+  receiptItemPrice: { color: "#111827", fontSize: 12, fontWeight: "700" },
+  receiptTotalBox: {
+    backgroundColor: "#F0F9FF",
+    borderRadius: 10,
+    padding: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    borderWidth: 2,
+    borderColor: "#10B981",
+  },
+  receiptTotalLabel: { color: "#065F46", fontSize: 13, fontWeight: "900" },
+  receiptTotalValue: { color: "#065F46", fontSize: 22, fontWeight: "900" },
+  receiptThanks: {
+    color: "#374151",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 16,
+    fontWeight: "700",
+  },
+  receiptDate: {
+    color: "#9CA3AF",
+    fontSize: 10,
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  receiptActions: { flexDirection: "row", gap: 10, marginTop: 8 },
+  receiptBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
+    backgroundColor: "#F3F4F6",
+  },
+  receiptBtnPrimary: { backgroundColor: COLORS.primary },
+  receiptBtnText: { color: "#374151", fontSize: 13, fontWeight: "900" },
 });
