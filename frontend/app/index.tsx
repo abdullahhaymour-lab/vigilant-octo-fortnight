@@ -63,6 +63,10 @@ export default function Dashboard() {
   );
 
   useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  useEffect(() => {
     const t = setInterval(() => setTick((v) => v + 1), 1000);
     return () => clearInterval(t);
   }, []);
@@ -84,25 +88,13 @@ export default function Dashboard() {
   const handleRoomPress = async (room: Room) => {
     const sess = sessionByRoom[room.id];
     if (!sess) {
-      // Start new session
-      Alert.alert(
-        "بدء جلسة جديدة",
-        `غرفة: ${room.name}\nالسعر: ${formatJD(room.price_per_hour)}/ساعة`,
-        [
-          { text: "إلغاء", style: "cancel" },
-          {
-            text: "ابدأ",
-            onPress: async () => {
-              try {
-                await api.startSession(room.id);
-                await loadAll();
-              } catch (e: any) {
-                Alert.alert("خطأ", e.message);
-              }
-            },
-          },
-        ]
-      );
+      // Start session immediately
+      try {
+        await api.startSession(room.id);
+        await loadAll();
+      } catch (e: any) {
+        Alert.alert("خطأ", e.message);
+      }
     } else {
       // Open session details modal
       setSelectedRoom(room);
@@ -112,30 +104,14 @@ export default function Dashboard() {
 
   const handleStop = async () => {
     if (!selectedSession) return;
-    Alert.alert(
-      "إنهاء الجلسة",
-      `الإجمالي: ${formatJD(
-        computeLiveCost(selectedSession.started_at, selectedSession.price_per_hour) +
-          selectedSession.cafeteria_cost
-      )}\nهل أنت متأكد من إنهاء الجلسة؟`,
-      [
-        { text: "تراجع", style: "cancel" },
-        {
-          text: "إنهاء",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await api.stopSession(selectedSession.id);
-              setSelectedRoom(null);
-              setSelectedSession(null);
-              await loadAll();
-            } catch (e: any) {
-              Alert.alert("خطأ", e.message);
-            }
-          },
-        },
-      ]
-    );
+    try {
+      await api.stopSession(selectedSession.id);
+      setSelectedRoom(null);
+      setSelectedSession(null);
+      await loadAll();
+    } catch (e: any) {
+      Alert.alert("خطأ", e.message);
+    }
   };
 
   const handleAddItem = async (product: Product) => {
