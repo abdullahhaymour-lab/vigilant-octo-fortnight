@@ -11,20 +11,23 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
-import { api, COLORS, formatJD, type Product } from "../src/api";
+import { api, COLORS, formatJD, type Product, type Session } from "../src/api";
 
 type CartItem = { product: Product; qty: number };
 
 export default function Cafeteria() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [activeSessions, setActiveSessions] = useState<Session[]>([]);
   const [cart, setCart] = useState<Record<string, CartItem>>({});
+  const [targetSessionId, setTargetSessionId] = useState<string | null>(null); // null = standalone
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const p = await api.listProducts();
+      const [p, s] = await Promise.all([api.listProducts(), api.activeSessions()]);
       setProducts(p);
+      setActiveSessions(s);
     } catch (e: any) {
       console.log(e.message);
     } finally {
@@ -73,15 +76,27 @@ export default function Cafeteria() {
     if (itemCount === 0) return;
     setSubmitting(true);
     try {
-      await api.cafeteriaSale(
-        Object.values(cart).map((c) => ({
-          product_id: c.product.id,
-          quantity: c.qty,
-        }))
-      );
+      if (targetSessionId) {
+        // Add each item to the room's session
+        for (const c of Object.values(cart)) {
+          await api.addItem(targetSessionId, c.product.id, c.qty);
+        }
+        const room = activeSessions.find((s) => s.id === targetSessionId);
+        Alert.alert(
+          "تم",
+          `أُضيفت ${itemCount} صنف لفاتورة ${room?.room_name || "الغرفة"}\nالإجمالي: ${formatJD(total)}`
+        );
+      } else {
+        await api.cafeteriaSale(
+          Object.values(cart).map((c) => ({
+            product_id: c.product.id,
+            quantity: c.qty,
+          }))
+        );
+        Alert.alert("تم", `تم تسجيل البيع بنجاح\nالإجمالي: ${formatJD(total)}`);
+      }
       setCart({});
       await load();
-      Alert.alert("تم", `تم تسجيل البيع بنجاح\nالإجمالي: ${formatJD(total)}`);
     } catch (e: any) {
       Alert.alert("خطأ", e.message);
     } finally {
@@ -99,12 +114,79 @@ export default function Cafeteria() {
     );
   }
 
+  const targetSession = targetSessionId
+    ? activeSessions.find((s) => s.id === targetSessionId)
+    : null;
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.title}>الكافتيريا</Text>
-        <Text style={styles.sub}>نقطة بيع مستقلة</Text>
+        <Text style={styles.sub}>
+          {targetSession
+            ? `إضافة لفاتورة: ${targetSession.room_name}`
+            : "بيع مستقل (نقدي)"}
+        </Text>
       </View>
+
+      {/* Target selector */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.targetRow}
+      >
+        <TouchableOpacity
+          style={[styles.targetChip, targetSessionId === null && styles.targetChipActive]}
+          onPress={() => setTargetSessionId(null)}
+          testID="target-standalone"
+        >
+          <Ionicons
+            name="cash-outline"
+            size={16}
+            color={targetSessionId === null ? "#000" : COLORS.text}
+          />
+          <Text
+            style={[
+              styles.targetChipText,
+              targetSessionId === null && { color: "#000" },
+            ]}
+          >
+            بيع مستقل
+          </Text>
+        </TouchableOpacity>
+        {activeSessions.length === 0 ? (
+          <View style={styles.noActiveBadge}>
+            <Ionicons name="information-circle-outline" size={14} color={COLORS.textDim} />
+            <Text style={styles.noActiveText}>لا توجد غرف نشطة</Text>
+          </View>
+        ) : (
+          activeSessions.map((s) => (
+            <TouchableOpacity
+              key={s.id}
+              style={[
+                styles.targetChip,
+                targetSessionId === s.id && styles.targetChipActiveRoom,
+              ]}
+              onPress={() => setTargetSessionId(s.id)}
+              testID={`target-room-${s.room_id}`}
+            >
+              <Ionicons
+                name="game-controller"
+                size={16}
+                color={targetSessionId === s.id ? "#000" : COLORS.primary}
+              />
+              <Text
+                style={[
+                  styles.targetChipText,
+                  targetSessionId === s.id && { color: "#000" },
+                ]}
+              >
+                {s.room_name}
+              </Text>
+            </TouchableOpacity>
+          ))
+        )}
+      </ScrollView>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {categories.map((cat) => (
@@ -172,9 +254,17 @@ export default function Cafeteria() {
             <View>
               <Text style={styles.totalLabel}>الإجمالي</Text>
               <Text style={styles.totalValue}>{formatJD(total)}</Text>
+              {targetSession && (
+                <Text style={styles.targetHint}>
+                  → {targetSession.room_name}
+                </Text>
+              )}
             </View>
             <TouchableOpacity
-              style={styles.checkoutBtn}
+              style={[
+                styles.checkoutBtn,
+                targetSession && { backgroundColor: COLORS.success },
+              ]}
               onPress={checkout}
               disabled={submitting}
               testID="checkout-btn"
@@ -183,8 +273,14 @@ export default function Cafeteria() {
                 <ActivityIndicator color="#000" />
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle" size={20} color="#000" />
-                  <Text style={styles.checkoutText}>تأكيد البيع</Text>
+                  <Ionicons
+                    name={targetSession ? "add-circle" : "checkmark-circle"}
+                    size={20}
+                    color="#000"
+                  />
+                  <Text style={styles.checkoutText}>
+                    {targetSession ? "أضف للفاتورة" : "تأكيد البيع"}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -197,9 +293,33 @@ export default function Cafeteria() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.bg },
-  header: { padding: 16 },
+  header: { padding: 16, paddingBottom: 8 },
   title: { color: COLORS.text, fontSize: 24, fontWeight: "900" },
   sub: { color: COLORS.textMuted, fontSize: 13, marginTop: 2 },
+  targetRow: { paddingHorizontal: 16, gap: 8, paddingBottom: 12 },
+  targetChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginEnd: 8,
+  },
+  targetChipActive: { backgroundColor: COLORS.text, borderColor: COLORS.text },
+  targetChipActiveRoom: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  targetChipText: { color: COLORS.text, fontSize: 13, fontWeight: "800" },
+  noActiveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  noActiveText: { color: COLORS.textDim, fontSize: 12 },
   scroll: { paddingHorizontal: 16, paddingBottom: 20 },
   catTitle: { color: COLORS.text, fontSize: 15, fontWeight: "800", marginBottom: 10 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
@@ -258,6 +378,7 @@ const styles = StyleSheet.create({
   },
   totalLabel: { color: COLORS.textMuted, fontSize: 11, fontWeight: "700" },
   totalValue: { color: COLORS.text, fontSize: 22, fontWeight: "900" },
+  targetHint: { color: COLORS.success, fontSize: 11, fontWeight: "700", marginTop: 2 },
   checkoutBtn: {
     flexDirection: "row",
     backgroundColor: COLORS.primary,
