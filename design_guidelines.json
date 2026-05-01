@@ -1,0 +1,92 @@
+{
+  "theme": "dark",
+  "archetype": "Performance Pro (Archetype 2) infused with Web3/Gaming neon accents",
+  "direction": "RTL",
+  "typography": {
+    "font_family": {
+      "headings": "'Cairo', 'Tajawal', sans-serif",
+      "body": "'Tajawal', 'Almarai', sans-serif",
+      "mono": "'JetBrains Mono', 'Roboto Mono', monospace"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-black tracking-tight",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight",
+      "timer": "text-3xl sm:text-4xl font-mono font-bold tracking-tighter text-cyan-400",
+      "body": "text-base font-normal leading-relaxed",
+      "small_label": "text-xs font-bold uppercase tracking-[0.1em] text-zinc-500"
+    }
+  },
+  "colors": {
+    "background": "#050505",
+    "surface": "#0A0A0A",
+    "surface_glass": "rgba(10, 10, 10, 0.7)",
+    "border": "rgba(255, 255, 255, 0.1)",
+    "primary": "#00F0FF",
+    "primary_hover": "#00C4D1",
+    "accent_active": "#00F0FF",
+    "accent_idle": "#27272A",
+    "text_primary": "#FFFFFF",
+    "text_secondary": "#A1A1AA",
+    "success": "#10B981",
+    "danger": "#F43F5E",
+    "warning": "#F59E0B"
+  },
+  "layout_and_spacing": {
+    "philosophy": "Control Room Grid - High density but perfectly organized for scanning active timers and revenue. Deep immersive gaming lounge vibe.",
+    "spacing_scale": "p-4, p-6, p-8. Use logical properties like ps-4, pe-4, ms-2, me-2 for RTL support.",
+    "container": "w-full max-w-7xl mx-auto px-4 md:px-8",
+    "grid_rooms": "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6",
+    "grid_cafeteria": "grid grid-cols-2 lg:grid-cols-3 gap-4"
+  },
+  "components": {
+    "room_card": {
+      "idle": "bg-zinc-950 border border-zinc-800 rounded-2xl p-5 flex flex-col justify-between transition-all duration-300",
+      "active": "bg-zinc-900 border border-cyan-500/50 rounded-2xl p-5 flex flex-col justify-between shadow-[0_0_20px_rgba(0,240,255,0.15)] relative overflow-hidden",
+      "timer_display": "font-mono text-3xl md:text-4xl font-bold text-cyan-400 mt-2 mb-1 text-left",
+      "cost_display": "text-lg font-bold text-white",
+      "action_button": "mt-4 w-full h-12 rounded-xl flex items-center justify-center font-bold text-sm transition-all"
+    },
+    "cafeteria_pos": {
+      "container": "bg-zinc-950/80 backdrop-blur-xl border-s border-zinc-800 p-6 flex flex-col h-full",
+      "product_card": "bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 cursor-pointer flex flex-col items-center text-center transition-colors",
+      "cart_item": "flex items-center justify-between p-3 border-b border-zinc-800/50 last:border-0"
+    },
+    "header": {
+      "container": "sticky top-0 z-50 w-full bg-[#050505]/80 backdrop-blur-2xl border-b border-white/5 h-20 flex items-center justify-between px-6"
+    },
+    "stats_widget": {
+      "container": "bg-zinc-900/50 border border-white/5 rounded-2xl p-6 flex items-center gap-4",
+      "value": "text-3xl font-black text-white",
+      "label": "text-sm font-medium text-zinc-400"
+    }
+  },
+  "motion_and_interactions": {
+    "hover_states": "Cards lift slightly (-translate-y-1) with increased shadow. Buttons brighten on hover.",
+    "active_pulse": "Active room cards should have a very subtle pulse animation on their border or a tracing beam effect to indicate live time.",
+    "transitions": "Use transition-all duration-300 ease-out for standard interactions."
+  },
+  "icons_and_assets": {
+    "icon_library": "lucide-react",
+    "currency_symbol": "د.أ",
+    "images": {
+      "playstation_bg": "https://images.unsplash.com/photo-1549614614-b8f90c10b52e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2OTV8MHwxfHNlYXJjaHwyfHxwbGF5c3RhdGlvbiUyMGNvbnRyb2xsZXIlMjBkYXJrfGVufDB8fHx8MTc3NzYwODgxNHww&ixlib=rb-4.1.0&q=85",
+      "energy_drink": "https://images.unsplash.com/photo-1629090736831-09ce6134af0c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwxfHxlbmVyZ3klMjBkcmluayUyMGRhcmslMjBiYWNrZ3JvdW5kfGVufDB8fHx8MTc3NzYwODgxNHww&ixlib=rb-4.1.0&q=85",
+      "coffee": "https://images.unsplash.com/photo-1649612427727-31f1e184e9e8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NTZ8MHwxfHNlYXJjaHwyfHxjb2ZmZWUlMjBjdXAlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3Nzc2MDg4MTR8MA&ixlib=rb-4.1.0&q=85",
+      "snacks": "https://images.unsplash.com/photo-1621939514649-280e2ee25f60?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwyfHxzbmFja3N8ZW58MHx8fHwxNzc3NjA4ODE0fDA&ixlib=rb-4.1.0&q=85"
+    }
+  },
+  "specific_instructions_for_main_agent": [
+    "CRITICAL: Set dir='rtl' on the root HTML tag or main layout container. The entire UI must be Arabic Right-to-Left natively.",
+    "Use Tailwind logical properties (ps-, pe-, ms-, me-, start-, end-) instead of directional ones (pl-, pr-, ml-, mr-) to ensure perfect RTL rendering.",
+    "Dashboard must show Live Sessions count, today's PlayStation revenue, and today's Cafeteria revenue as separate prominent stats widgets.",
+    "Rooms Grid must contain exactly 16 room cards.",
+    "Room card state MUST clearly differentiate 'Idle' (Slate/Gray border, muted text) and 'Active' (Neon Cyan border, glowing shadow, live elapsed monospace timer).",
+    "Session cost must be dynamically calculated based on elapsed minutes and the room's specific price per hour.",
+    "Cafeteria POS should be a persistent side panel on desktop or accessible via a bottom sheet/modal on mobile views. It must support adding items to a specific active room's bill or as a standalone purchase.",
+    "All interactive elements MUST have a 'data-testid' attribute (e.g., data-testid='start-session-btn', data-testid='room-card-1', data-testid='pos-add-item').",
+    "Avoid standard generic fonts. Use 'Tajawal' or 'Cairo' from Google Fonts for Arabic text to maintain a modern aesthetic. Apply via global css import.",
+    "Monospace font is MANDATORY for the session timers (e.g. 02:45:10) so the numbers do not jump around as seconds tick. Force LTR direction on the timer text itself if necessary to prevent layout flipping within the timer string.",
+    "Use Shadcn UI primitives customized to match the dark neon theme. No standard HTML select/inputs for complex interactions.",
+    "Add a subtle 'tracing beam' or animated border effect on active room cards to make the command-center feel alive."
+  ]
+}
