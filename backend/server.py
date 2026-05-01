@@ -311,6 +311,47 @@ async def remove_session_item(session_id: str, item_id: str):
     sess["total_cost"] = round(play_cost + cafe, 3)
     return Session(**sess)
 
+@api_router.put("/sessions/{session_id}/times", response_model=Session)
+async def update_session_times(session_id: str, update: SessionTimeUpdate):
+    sess = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not sess:
+        raise HTTPException(404, "الجلسة غير موجودة")
+    payload = {}
+    if update.started_at:
+        try:
+            datetime.fromisoformat(update.started_at)
+        except Exception:
+            raise HTTPException(400, "صيغة وقت البداية غير صحيحة")
+        payload["started_at"] = update.started_at
+    if update.ended_at is not None:
+        if update.ended_at:
+            try:
+                datetime.fromisoformat(update.ended_at)
+            except Exception:
+                raise HTTPException(400, "صيغة وقت النهاية غير صحيحة")
+            payload["ended_at"] = update.ended_at
+        else:
+            payload["ended_at"] = None
+    if not payload:
+        raise HTTPException(400, "لا يوجد تحديثات")
+    await db.sessions.update_one({"id": session_id}, {"$set": payload})
+    sess = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    started = sess["started_at"]
+    ended = sess.get("ended_at") if sess.get("status") == "closed" else None
+    minutes, play_cost = compute_play_cost(started, sess["price_per_hour"], ended)
+    cafe = sum(i["subtotal"] for i in sess.get("items", []))
+    final_updates = {
+        "elapsed_minutes": minutes,
+        "play_cost": round(play_cost, 3),
+        "cafeteria_cost": round(cafe, 3),
+        "total_cost": round(play_cost + cafe, 3),
+    }
+    await db.sessions.update_one({"id": session_id}, {"$set": final_updates})
+    sess = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    return Session(**sess)
+
+
+
 
 @api_router.get("/sessions/history", response_model=List[Session])
 async def session_history(limit: int = 100):
