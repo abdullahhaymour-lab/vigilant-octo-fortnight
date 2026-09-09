@@ -1,8 +1,11 @@
 {
   "expo": {
     "name": "frontend",
-"sdkVersion": "54",
     "slug": "frontend",
+    "sdkVersion": "54",
+    "updates": {
+      "enabled": false
+    },
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -25,20 +28,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#000"
-        }
-      ],
-      "expo-web-browser"
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
+      "expo-router"
+    ]
   }
 }
